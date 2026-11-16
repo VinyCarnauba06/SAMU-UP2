@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PULSO 192 — Regulação SAMU Maceió</title>
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/static/css/estilo.css?v=3.0">
+</head>
+<body>
+  <header class="topo-comando">
+    <div class="topo-marca">
+      <span class="selo-emergencia">SAMU 192</span>
+      <h1>PULSO <span class="meta-operacional-topo">· 24 nós · 39 vias · Maceió-AL</span></h1>
+    </div>
+    <div class="topo-metricas" aria-live="polite">
+      <div class="metrica-chip">
+        <span class="metrica-rotulo">TRIAGEM (DEQUE)</span>
+        <strong id="kpi-deque">0</strong>
+      </div>
+      <div class="metrica-chip">
+        <span class="metrica-rotulo">FROTA ATIVA</span>
+        <strong id="kpi-frota">0</strong>
+      </div>
+      <div class="metrica-chip">
+        <span class="metrica-rotulo">LEITOS LIVRES</span>
+        <strong id="kpi-leitos">0</strong>
+      </div>
+      <div class="metrica-chip">
+        <span class="metrica-rotulo">MALHA VIÁRIA</span>
+        <strong id="kpi-malha">100%</strong>
+      </div>
+      <div class="metrica-chip">
+        <span class="metrica-rotulo">AÇÕES (PILHA)</span>
+        <strong id="kpi-pilha">0</strong>
+      </div>
+    </div>
+    <div class="topo-acoes">
+      <button type="button" id="btn-desfazer-topo" class="botao botao-secundario">Desfazer Ação</button>
+      <button type="button" id="btn-reiniciar" class="botao botao-fantasma">Reiniciar Dados</button>
+    </div>
+  </header>
+
+  <div id="barra-notificacao" class="barra-notificacao oculto" role="status" aria-live="polite"></div>
+
+  <main class="grade-principal">
+    <section class="coluna-visualizacao" aria-label="Visualização Geográfica e Gráficos">
+      <div class="barra-modos-visuais" role="tablist" aria-label="Modo de Visualização">
+        <button type="button" class="aba-visual ativa" data-vis="mapa" role="tab" aria-selected="true">
+          Mapa Operacional
+        </button>
+        <button type="button" class="aba-visual" data-vis="folium" role="tab" aria-selected="false">
+          Rotas e Contingência
+        </button>
+        <button type="button" class="aba-visual" data-vis="mpl-grafo" role="tab" aria-selected="false">
+          Topologia do Grafo
+        </button>
+        <button type="button" class="aba-visual" data-vis="mpl-hash" role="tab" aria-selected="false">
+          Tabelas Hash
+        </button>
+        <button type="button" class="aba-visual" data-vis="mpl-ordenacao" role="tab" aria-selected="false">
+          Comparativo de Ordenação
+        </button>
+      </div>
+
+      <div id="painel-vis-mapa" class="container-visual ativo">
+        <div id="mapa-leaflet" class="mapa-canvas"></div>
+        <div class="legenda-mapa">
+          <span><i class="ponto-legenda hosp"></i> Hospital / UPA</span>
+          <span><i class="ponto-legenda samu"></i> Base SAMU 192</span>
+          <span><i class="ponto-legenda bairro"></i> Ponto / Bairro</span>
+          <span><i class="linha-legenda rota"></i> Rota de Despacho Ativa</span>
+          <span><i class="linha-legenda mst"></i> Malha Tronco Principal</span>
+          <span><i class="linha-legenda bloq"></i> Via Interditada</span>
+          <div class="camada-transito-box" style="display: inline-flex; align-items: center; gap: 5px;">
+            <label for="seletor-estilo-mapa" style="font-size: 11px; font-weight: 500;">Camada:</label>
+            <select id="seletor-estilo-mapa" style="font-size: 11px; padding: 2px 4px;">
+              <option value="traffic-day-v2" selected>Trânsito (Mapbox Traffic)</option>
+              <option value="navigation-day-v1">Navegação SAMU</option>
+              <option value="streets-v12">Ruas e Avenidas</option>
+              <option value="dark-v11">Modo Escuro</option>
+            </select>
+          </div>
+          <strong id="rotulo-rota-ativa" class="rotulo-rota-ativa">Pronto para despacho</strong>
+        </div>
+      </div>
+
+      <div id="painel-vis-folium" class="container-visual">
+        <div class="controles-mpl">
+          <label for="folium-origem">Origem:</label>
+          <select id="folium-origem"></select>
+          <label for="folium-destino">Destino:</label>
+          <select id="folium-destino"></select>
+          <label for="folium-no-indisponivel">Ponto bloqueado:</label>
+          <select id="folium-no-indisponivel">
+            <option value="">Automático</option>
+          </select>
+          <label for="folium-autonomia">Alcance:</label>
+          <select id="folium-autonomia">
+            <option value="3500" selected>3.500 m</option>
+            <option value="2500">2.500 m</option>
+            <option value="5000">5.000 m</option>
+            <option value="sem_limite">Sem restrição</option>
+          </select>
+          <button type="button" id="btn-atualizar-folium" class="botao botao-primario">Atualizar mapa</button>
+          <a id="link-download-folium" href="/api/mapa/folium?download=1" class="botao botao-secundario">Exportar HTML</a>
+        </div>
+        <iframe id="iframe-folium" class="mapa-canvas iframe-folium" title="Mapa Georreferenciado de Rotas e Contingência"></iframe>
+      </div>
+
+      <div id="painel-vis-mpl-grafo" class="container-visual">
+        <div class="controles-mpl">
+          <label for="mpl-grafo-modo">Modo:</label>
+          <select id="mpl-grafo-modo">
+            <option value="dijkstra">Melhor Rota (Dijkstra)</option>
+            <option value="mst">Malha Tronco (Prim - MST)</option>
+            <option value="networkx">Contingência (NetworkX + Haversine)</option>
+          </select>
+          <label for="mpl-grafo-origem">Origem:</label>
+          <select id="mpl-grafo-origem"></select>
+          <label for="mpl-grafo-destino">Destino:</label>
+          <select id="mpl-grafo-destino"></select>
+          <button type="button" id="btn-atualizar-mpl-grafo" class="botao botao-primario">Atualizar malha</button>
+          <a id="link-download-mpl-grafo" href="/api/graficos/malha-viaria.png" download="malha_viaria_maceio.png" class="botao botao-secundario">Exportar PNG</a>
+        </div>
+        <div class="quadro-imagem-mpl">
+          <img id="img-mpl-grafo" src="/api/graficos/malha-viaria.png" alt="Diagrama da Malha Georreferenciada de Maceió">
+        </div>
+      </div>
+
+      <div id="painel-vis-mpl-hash" class="container-visual">
+        <div class="controles-mpl">
+          <span>Distribuição dos baldes em memória</span>
+          <button type="button" id="btn-atualizar-mpl-hash" class="botao botao-primario">Atualizar gráfico</button>
+          <a href="/api/graficos/hash.png" download="distribuicao_hash.png" class="botao botao-secundario">Exportar PNG</a>
+        </div>
+        <div class="quadro-imagem-mpl">
+          <img id="img-mpl-hash" src="/api/graficos/hash.png" alt="Distribuição dos Baldes Hash">
+        </div>
+      </div>
+
+      <div id="painel-vis-mpl-ordenacao" class="container-visual">
+        <div class="controles-mpl">
+          <label for="mpl-ord-n">Amostra (N):</label>
+          <select id="mpl-ord-n">
+            <option value="40">40 registros</option>
+            <option value="120" selected>120 registros</option>
+            <option value="250">250 registros</option>
+            <option value="380">380 registros</option>
+          </select>
+          <button type="button" id="btn-atualizar-mpl-ord" class="botao botao-primario">Rodar Comparativo</button>
+          <a id="link-download-mpl-ord" href="/api/graficos/ordenacao.png?n=120" download="comparativo_ordenacao.png" class="botao botao-secundario">Exportar PNG</a>
+        </div>
+        <div class="quadro-imagem-mpl">
+          <img id="img-mpl-ordenacao" src="/api/graficos/ordenacao.png?n=120" alt="Comparativo dos Algoritmos de Ordenação">
+        </div>
+      </div>
+    </section>
+
+    <section class="coluna-operacao" aria-label="Painéis de Operação e Regulação">
+      <nav class="abas-operacao" role="tablist" aria-label="Módulos do Sistema">
+        <button type="button" class="aba-op ativa" data-aba="triagem" role="tab" aria-selected="true">
+          Triagem
+        </button>
+        <button type="button" class="aba-op" data-aba="hash" role="tab" aria-selected="false">
+          Tabelas Hash
+        </button>
+        <button type="button" class="aba-op" data-aba="grafos" role="tab" aria-selected="false">
+          Grafos / Rotas
+        </button>
+        <button type="button" class="aba-op" data-aba="ordenacao" role="tab" aria-selected="false">
+          Ordenação
+        </button>
+        <button type="button" class="aba-op" data-aba="historico" role="tab" aria-selected="false">
+          Histórico (Desfazer)
+        </button>
+      </nav>
+
+      <div id="aba-triagem" class="conteudo-aba ativo">
+        <div class="bloco-painel">
+          <div class="cabecalho-bloco">
+            <div>
+              <h2>Fila de Triagem (Deque)</h2>
+            </div>
+            <div class="grupo-botoes-compacto">
+              <button type="button" id="btn-despachar-inicio" class="botao botao-primario">
+                Despachar Início (Urgência)
+              </button>
+              <button type="button" id="btn-despachar-fim" class="botao botao-secundario">
+                Despachar Fim (Leve)
+              </button>
+            </div>
+          </div>
+          <p class="explicacao-curta">
+            Casos graves (gravidade 8–10) entram no início; casos leves (1–7) entram no final.
+          </p>
+          <div id="lista-deque-triagem" class="lista-cartoes"></div>
+        </div>
+
+        <div class="bloco-painel">
+          <h3>Novo Chamado</h3>
+          <form id="form-novo-chamado" class="formulario-grade">
+            <div class="campo">
+              <label for="chamado-cpf">CPF do Paciente</label>
+              <input type="text" id="chamado-cpf" placeholder="Ex.: 10482937401" required>
+            </div>
+            <div class="campo">
+              <label for="chamado-nome">Nome do Paciente</label>
+              <input type="text" id="chamado-nome" placeholder="Ex.: João Victor Alencar" required>
+            </div>
+            <div class="campo">
+              <label for="chamado-vertice">Bairro / Local da Ocorrência</label>
+              <select id="chamado-vertice" required></select>
+            </div>
+            <div class="campo">
+              <label for="chamado-gravidade">Gravidade (1 a 10)</label>
+              <input type="number" id="chamado-gravidade" min="1" max="10" value="9" required>
+            </div>
+            <div class="campo campo-largo">
+              <label for="chamado-descricao">Descrição da Ocorrência</label>
+              <input type="text" id="chamado-descricao" placeholder="Ex.: Colisão na Av. Fernandes Lima" required>
+            </div>
+            <div class="campo campo-largo">
+              <button type="submit" class="botao botao-primario largura-total">Adicionar à Triagem</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="bloco-painel">
+          <h3>Hospitais e Leitos</h3>
+          <div id="lista-hospitais-regulacao" class="lista-cartoes"></div>
+        </div>
+
+        <div class="bloco-painel">
+          <h3>Ambulâncias</h3>
+          <div id="lista-ambulancias" class="lista-cartoes"></div>
+        </div>
+      </div>
+
+      <div id="aba-hash" class="conteudo-aba">
+        <div class="bloco-painel">
+          <div class="cabecalho-bloco">
+            <div>
+              <h2>Tabelas Hash em Memória</h2>
+            </div>
+            <button type="button" id="btn-ver-grafico-hash" class="botao botao-secundario">Ver gráfico</button>
+          </div>
+          <div id="painel-tabelas-hash" class="lista-cartoes"></div>
+        </div>
+
+        <div class="bloco-painel">
+          <h3>Buscar Registro na Hash</h3>
+          <form id="form-busca-hash" class="formulario-grade">
+            <div class="campo">
+              <label for="hash-tipo">Tabela</label>
+              <select id="hash-tipo">
+                <option value="cpf">Pacientes (CPF)</option>
+                <option value="cep">Hospitais (CEP)</option>
+                <option value="rota">Cache de Rotas</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label for="hash-chave">Chave</label>
+              <input type="text" id="hash-chave" value="10482937401" required>
+            </div>
+            <div class="campo campo-largo">
+              <button type="submit" class="botao botao-primario largura-total">Buscar registro</button>
+            </div>
+          </form>
+          <div id="resultado-busca-hash" class="caixa-resultado-codigo"></div>
+        </div>
+
+        <div class="bloco-painel">
+          <h3>Cadastrar Paciente</h3>
+          <form id="form-novo-paciente-hash" class="formulario-grade">
+            <div class="campo">
+              <label for="pac-cpf">CPF (11 dígitos)</label>
+              <input type="text" id="pac-cpf" placeholder="88192039411" required>
+            </div>
+            <div class="campo">
+              <label for="pac-nome">Nome Completo</label>
+              <input type="text" id="pac-nome" placeholder="Mariana Soares Lira" required>
+            </div>
+            <div class="campo">
+              <label for="pac-sangue">Tipo Sanguíneo</label>
+              <select id="pac-sangue">
+                <option value="O+">O+</option>
+                <option value="A+">A+</option>
+                <option value="B+">B+</option>
+                <option value="AB+">AB+</option>
+                <option value="O-">O-</option>
+                <option value="A-">A-</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label for="pac-idade">Idade</label>
+              <input type="number" id="pac-idade" value="36" min="0" max="120">
+            </div>
+            <div class="campo campo-largo">
+              <button type="submit" class="botao botao-secundario largura-total">Salvar paciente</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="bloco-painel">
+          <h3>Efeito Avalanche (HMAC-SHA256)</h3>
+          <form id="form-avalanche-hash" class="formulario-grade">
+            <div class="campo">
+              <label for="avalanche-cpf-1">CPF Base</label>
+              <input type="text" id="avalanche-cpf-1" value="10482937401" required>
+            </div>
+            <div class="campo">
+              <label for="avalanche-cpf-2">CPF com 1 dígito trocado</label>
+              <input type="text" id="avalanche-cpf-2" value="10482937402" required>
+            </div>
+            <div class="campo campo-largo">
+              <button type="submit" class="botao botao-primario largura-total">Calcular variação de bits</button>
+            </div>
+          </form>
+          <div id="resultado-avalanche-hash" class="caixa-resultado-codigo" style="display: none;"></div>
+        </div>
+      </div>
+
+      <div id="aba-grafos" class="conteudo-aba">
+        <div class="bloco-painel">
+          <div class="cabecalho-bloco">
+            <div>
+              <h2>Grafos e Rotas</h2>
+            </div>
+            <button type="button" id="btn-ver-mapa-folium" class="botao botao-secundario">Abrir mapa</button>
+          </div>
+          <form id="form-analise-grafo" class="formulario-grade">
+            <div class="campo campo-largo">
+              <label for="grafo-algoritmo">Algoritmo</label>
+              <select id="grafo-algoritmo">
+                <option value="dijkstra">Melhor Rota (Dijkstra)</option>
+                <option value="networkx_resiliencia">Alcance e Contingência (NetworkX + Haversine)</option>
+                <option value="mst">Árvore Geradora Mínima (Prim)</option>
+                <option value="bfs">Busca em Largura (BFS)</option>
+                <option value="dfs">Busca em Profundidade (DFS)</option>
+                <option value="representacoes">Matriz e Lista de Adjacência</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label for="grafo-origem">Origem</label>
+              <select id="grafo-origem"></select>
+            </div>
+            <div class="campo">
+              <label for="grafo-destino">Destino</label>
+              <select id="grafo-destino"></select>
+            </div>
+            <div class="campo">
+              <label for="grafo-no-indisponivel">Ponto bloqueado (Contingência)</label>
+              <select id="grafo-no-indisponivel">
+                <option value="">Automático</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label for="grafo-autonomia">Alcance máximo</label>
+              <select id="grafo-autonomia">
+                <option value="3500" selected>3.500 m</option>
+                <option value="2500">2.500 m</option>
+                <option value="5000">5.000 m</option>
+                <option value="0">Sem limite</option>
+              </select>
+            </div>
+            <div class="campo campo-largo">
+              <button type="submit" class="botao botao-primario largura-total">Calcular rota</button>
+            </div>
+          </form>
+          <div id="resultado-analise-grafo" class="caixa-resultado-codigo"></div>
+        </div>
+
+        <div class="bloco-painel">
+          <h3>Trânsito e Bloqueio de Vias</h3>
+          <form id="form-alterar-via" class="formulario-grade">
+            <div class="campo campo-largo">
+              <label for="via-selecionada">Trecho</label>
+              <select id="via-selecionada"></select>
+            </div>
+            <div class="campo">
+              <label for="via-fator">Fator de trânsito</label>
+              <input type="number" id="via-fator" step="0.1" min="0.5" max="4.0" value="2.2">
+            </div>
+            <div class="campo">
+              <label for="via-bloqueada">Situação</label>
+              <select id="via-bloqueada">
+                <option value="false">Liberada</option>
+                <option value="true">Interditada</option>
+              </select>
+            </div>
+            <div class="campo campo-largo">
+              <button type="submit" class="botao botao-secundario largura-total">Aplicar alteração</button>
+            </div>
+          </form>
+        </div>
+      </div>
+            <div class="campo campo-largo">
+              <label for="via-selecionada">Via / Trecho</label>
+              <select id="via-selecionada"></select>
+            </div>
+            <div class="campo">
+              <label for="via-fator">Fator de Trânsito</label>
+              <input type="number" id="via-fator" step="0.1" min="0.5" max="4.0" value="2.2">
+            </div>
+            <div class="campo">
+              <label for="via-bloqueada">Situação</label>
+              <select id="via-bloqueada">
+                <option value="false">Liberada</option>
+                <option value="true">Interditada</option>
+              </select>
+            </div>
+            <div class="campo campo-largo">
+              <button type="submit" class="botao botao-secundario largura-total">Atualizar Via</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="aba-ordenacao" class="conteudo-aba">
+        <div class="bloco-painel">
+          <div class="cabecalho-bloco">
+            <div>
+              <h2>Ordenação e Comparativo</h2>
+            </div>
+            <button type="button" id="btn-ver-grafico-ord" class="botao botao-secundario">Ver Gráfico Comparativo</button>
+          </div>
+          <form id="form-ordenacao" class="formulario-grade">
+            <div class="campo">
+              <label for="ord-alvo">Dados</label>
+              <select id="ord-alvo">
+                <option value="hospitais">Hospitais</option>
+                <option value="ocorrencias">Ocorrências</option>
+                <option value="ambulancias">Ambulâncias</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label for="ord-criterio">Critério</label>
+              <select id="ord-criterio">
+                <option value="taxa_ocupacao">Taxa de Ocupação (%)</option>
+                <option value="leitos_livres">Leitos Livres</option>
+                <option value="leitos_totais">Capacidade Total</option>
+                <option value="nome">Nome</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label for="ord-algoritmo">Algoritmo</label>
+              <select id="ord-algoritmo">
+                <option value="quick_sort">QuickSort (Mediana de 3)</option>
+                <option value="bubble_sort">Bubble Sort</option>
+                <option value="insertion_sort">Insertion Sort</option>
+                <option value="selection_sort">Selection Sort</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label for="ord-direcao">Ordem</label>
+              <select id="ord-direcao">
+                <option value="true">Decrescente</option>
+                <option value="false">Crescente</option>
+              </select>
+            </div>
+            <div class="campo campo-largo">
+              <button type="submit" class="botao botao-primario largura-total">Classificar dados</button>
+            </div>
+          </form>
+
+          <div class="tabela-wrapper">
+            <table class="tabela-dados" aria-label="Métricas dos algoritmos de ordenação">
+              <thead>
+                <tr>
+                  <th>Algoritmo</th>
+                  <th>Comparações</th>
+                  <th>Trocas</th>
+                  <th>Tempo (ms)</th>
+                  <th>Complexidade</th>
+                  <th>Estável</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-comparativo-ordenacao"></tbody>
+            </table>
+          </div>
+
+          <h3>Lista Ordenada</h3>
+          <div id="lista-resultado-ordenado" class="lista-cartoes"></div>
+        </div>
+      </div>
+
+      <div id="aba-historico" class="conteudo-aba">
+        <div class="bloco-painel">
+          <div class="cabecalho-bloco">
+            <div>
+              <h2>Histórico de Operações (Pilha)</h2>
+            </div>
+            <button type="button" id="btn-desfazer-aba" class="botao botao-primario">Desfazer ação</button>
+          </div>
+          <div id="lista-pilha-historico" class="lista-cartoes"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="/static/js/app.js?v=3.0"></script>
+</body>
+</html>
+

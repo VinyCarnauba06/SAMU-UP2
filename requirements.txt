@@ -1,0 +1,7 @@
+Flask>=3.0
+matplotlib>=3.8
+networkx>=3.2
+folium>=0.16
+pytest>=8.0
+
+
