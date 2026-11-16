@@ -49,9 +49,6 @@
         <button type="button" class="aba-visual ativa" data-vis="mapa" role="tab" aria-selected="true">
           Mapa Operacional
         </button>
-        <button type="button" class="aba-visual" data-vis="folium" role="tab" aria-selected="false">
-          Rotas e Contingência
-        </button>
         <button type="button" class="aba-visual" data-vis="mpl-grafo" role="tab" aria-selected="false">
           Topologia do Grafo
         </button>
@@ -83,29 +80,6 @@
           </div>
           <strong id="rotulo-rota-ativa" class="rotulo-rota-ativa">Pronto para despacho</strong>
         </div>
-      </div>
-
-      <div id="painel-vis-folium" class="container-visual">
-        <div class="controles-mpl">
-          <label for="folium-origem">Origem:</label>
-          <select id="folium-origem"></select>
-          <label for="folium-destino">Destino:</label>
-          <select id="folium-destino"></select>
-          <label for="folium-no-indisponivel">Ponto bloqueado:</label>
-          <select id="folium-no-indisponivel">
-            <option value="">Automático</option>
-          </select>
-          <label for="folium-autonomia">Alcance:</label>
-          <select id="folium-autonomia">
-            <option value="3500" selected>3.500 m</option>
-            <option value="2500">2.500 m</option>
-            <option value="5000">5.000 m</option>
-            <option value="sem_limite">Sem restrição</option>
-          </select>
-          <button type="button" id="btn-atualizar-folium" class="botao botao-primario">Atualizar mapa</button>
-          <a id="link-download-folium" href="/api/mapa/folium?download=1" class="botao botao-secundario">Exportar HTML</a>
-        </div>
-        <iframe id="iframe-folium" class="mapa-canvas iframe-folium" title="Mapa Georreferenciado de Rotas e Contingência"></iframe>
       </div>
 
       <div id="painel-vis-mpl-grafo" class="container-visual">
@@ -327,7 +301,7 @@
             <div>
               <h2>Grafos e Rotas</h2>
             </div>
-            <button type="button" id="btn-ver-mapa-folium" class="botao botao-secundario">Abrir mapa</button>
+            <button type="button" id="btn-ver-mapa-operacional" class="botao botao-secundario">Ver no mapa</button>
           </div>
           <form id="form-analise-grafo" class="formulario-grade">
             <div class="campo campo-largo">
@@ -500,7 +474,7 @@
   </main>
 
   <script src="/static/vendor/leaflet/leaflet.js"></script>
-  <script type="module" src="/static/js/app.js?v=3.1"></script>
+  <script type="module" src="/static/js/app.js?v=3.2"></script>
 </body>
 </html>
 

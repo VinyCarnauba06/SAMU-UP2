@@ -1000,7 +1000,7 @@ function configurarEventos() {
 
   document.getElementById('btn-ver-grafico-hash').addEventListener('click', () => alternarModoVisual('mpl-hash'));
   document.getElementById('btn-ver-grafico-ord').addEventListener('click', () => alternarModoVisual('mpl-ordenacao'));
-  document.getElementById('btn-ver-mapa-folium')?.addEventListener('click', () => alternarModoVisual('folium'));
+  document.getElementById('btn-ver-mapa-operacional')?.addEventListener('click', () => alternarModoVisual('mapa'));
 
   const selEstiloMapa = document.getElementById('seletor-estilo-mapa');
   if (selEstiloMapa) {
