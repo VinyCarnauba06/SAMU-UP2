@@ -1,4 +1,4 @@
-from app import app
+﻿from app import app
 
 
 def test_fluxo_completo_api_e_matplotlib() -> None:
@@ -84,7 +84,7 @@ def test_fluxo_completo_api_e_matplotlib() -> None:
     r_rep = client.get('/api/grafo/representacoes')
     assert r_rep.status_code == 200
     rep_json = r_rep.get_json()
-    assert rep_json['matriz_adjacencia']['dimensao'] == '24x24'
+    assert rep_json['matriz_adjacencia']['dimensao'] == '25x25'
 
     r_folium = client.get('/api/mapa/folium?origem_id=v-samu-farol&destino_id=v-hge&autonomia_m=3500')
     assert r_folium.status_code == 200
