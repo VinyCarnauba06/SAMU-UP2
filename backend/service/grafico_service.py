@@ -457,8 +457,8 @@ class GraficoService:
             )
             attr_mapa = '&copy; Mapbox &copy; OpenStreetMap | PULSO 192 Maceió'
         else:
-            url_mapbox = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-            attr_mapa = '&copy; OpenStreetMap &copy; CARTO | PULSO 192 Maceió'
+            url_mapbox = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+            attr_mapa = '&copy; OpenStreetMap contributors | PULSO 192 Maceió'
         mapa = folium.Map(
             location=[-9.632, -35.735],
             zoom_start=12,
@@ -475,8 +475,8 @@ class GraficoService:
         ).add_to(mapa)
 
         folium.TileLayer(
-            tiles='https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-            attr='&copy; OpenStreetMap &copy; CARTO',
+            tiles='https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            attr='&copy; OpenStreetMap contributors',
             name='Mapa Claro (CARTO)',
         ).add_to(mapa)
 
